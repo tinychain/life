@@ -190,7 +190,8 @@ func FullAOTCompile(vm *exec.VirtualMachine) *AOTContext {
 	})
 	tempDir, err := ioutil.TempDir("", "life-aot-")
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	inPath := path.Join(tempDir, "in.c")
@@ -198,10 +199,11 @@ func FullAOTCompile(vm *exec.VirtualMachine) *AOTContext {
 
 	err = ioutil.WriteFile(inPath, []byte(code), 0644)
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return nil
 	}
 
-	cmd := os_exec.Command("clang", "-fPIC", "-O2", "-o", outPath, "-shared", inPath)
+	cmd := os_exec.Command("clang", "-fPIC", "-O2", "-lm", "-o", outPath, "-shared", inPath)
 	out, err := cmd.CombinedOutput()
 
 	if len(out) > 0 {
@@ -209,14 +211,16 @@ func FullAOTCompile(vm *exec.VirtualMachine) *AOTContext {
 	}
 
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	outPathC := C.CString(outPath)
 	handle := C.dlopen(outPathC, C.RTLD_NOW|C.RTLD_LOCAL)
 	C.free(unsafe.Pointer(outPathC))
 	if handle == nil {
-		panic("unable to open compiled code")
+		log.Println("unable to open compiled code: " + C.GoString(C.dlerror()))
+		return nil
 	}
 
 	nativeVM := C.vm_alloc()
